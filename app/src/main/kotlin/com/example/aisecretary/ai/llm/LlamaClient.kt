@@ -6,10 +6,16 @@ import com.example.aisecretary.ai.llm.model.OllamaRequest
 import com.example.aisecretary.data.model.ConversationContext
 import com.example.aisecretary.data.model.MemoryFact
 import com.example.aisecretary.data.model.Message
+import com.example.aisecretary.data.model.StreamingChunk
+import com.example.aisecretary.data.model.StreamingResponse
+import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 import retrofit2.Retrofit
+import java.io.BufferedReader
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -22,6 +28,91 @@ class LlamaClient(private val retrofit: Retrofit) {
     // Track the last error time to implement waiting period
     private var lastErrorTime: Long = 0
     private val isRetrying = AtomicBoolean(false)
+
+    /**
+     * Sends a streaming message to the LLM and returns a Flow of chunks
+     */
+    suspend fun sendStreamingMessage(
+        message: String,
+        context: ConversationContext? = null,
+        systemPrompt: String = DEFAULT_SYSTEM_PROMPT
+    ): Flow<StreamingChunk> = flow {
+        try {
+            // Check if we need to wait after an error
+            val currentTime = System.currentTimeMillis()
+            if (currentTime - lastErrorTime < 60000 && lastErrorTime > 0) {
+                val waitTimeRemaining = 60000 - (currentTime - lastErrorTime)
+                if (waitTimeRemaining > 0 && !isRetrying.getAndSet(true)) {
+                    try {
+                        delay(waitTimeRemaining)
+                    } finally {
+                        isRetrying.set(false)
+                    }
+                }
+            }
+            
+            // Prepare the full prompt with memory and conversation history
+            val fullSystemPrompt = buildEnhancedSystemPrompt(
+                systemPrompt, 
+                context?.memoryFacts,
+                context?.recentMessages
+            )
+
+            val request = OllamaRequest(
+                model = BuildConfig.LLAMA_MODEL_NAME,
+                prompt = message,
+                system = fullSystemPrompt,
+                stream = true, // Enable streaming
+                options = OllamaOptions(
+                    temperature = 0.7f,
+                    maxTokens = 800
+                ),
+                keep_alive = 3600
+            )
+
+            val response = ollamaService.generateStreamingCompletion(request)
+            if (response.isSuccessful) {
+                lastErrorTime = 0
+                
+                response.body()?.let { responseBody ->
+                    val reader = BufferedReader(responseBody.charStream())
+                    val gson = Gson()
+                    
+                    reader.use { r ->
+                        var line: String?
+                        while (r.readLine().also { line = it } != null) {
+                            line?.let { jsonLine ->
+                                if (jsonLine.isNotBlank()) {
+                                    try {
+                                        val streamingResponse = gson.fromJson(jsonLine, StreamingResponse::class.java)
+                                        emit(StreamingChunk(
+                                            content = streamingResponse.response,
+                                            isComplete = streamingResponse.done
+                                        ))
+                                        
+                                        if (streamingResponse.done) {
+                                            return@flow
+                                        }
+                                    } catch (e: Exception) {
+                                        // Skip malformed JSON lines
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } ?: run {
+                    lastErrorTime = System.currentTimeMillis()
+                    emit(StreamingChunk("Error: Empty response body", true))
+                }
+            } else {
+                lastErrorTime = System.currentTimeMillis()
+                emit(StreamingChunk("Error: ${response.code()} ${response.message()}", true))
+            }
+        } catch (e: Exception) {
+            lastErrorTime = System.currentTimeMillis()
+            emit(StreamingChunk("Error: ${e.message}", true))
+        }
+    }
 
     /**
      * Sends a message to the LLM and returns the response
@@ -237,4 +328,7 @@ class LlamaClient(private val retrofit: Retrofit) {
             """
 
     }
-}
+}// New streaming endpoint addition:
+@Streaming
+@POST("/api/generate")
+suspend fun generateStreamingCompletion(@Body request: OllamaRequest): Response<ResponseBody>
