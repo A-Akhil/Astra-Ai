@@ -1,3 +1,4 @@
+
 package com.example.aisecretary.ai.llm
 
 import com.example.aisecretary.BuildConfig
@@ -6,12 +7,19 @@ import com.example.aisecretary.ai.llm.model.OllamaRequest
 import com.example.aisecretary.data.model.ConversationContext
 import com.example.aisecretary.data.model.MemoryFact
 import com.example.aisecretary.data.model.Message
+import com.example.aisecretary.data.model.StreamingChunk
+import com.example.aisecretary.data.model.StreamingResponse
+import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 import retrofit2.Retrofit
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.regex.Pattern
 
 class LlamaClient(private val retrofit: Retrofit) {
 
@@ -19,9 +27,15 @@ class LlamaClient(private val retrofit: Retrofit) {
         retrofit.create(OllamaService::class.java)
     }
     
+    private val gson = Gson()
+    
     // Track the last error time to implement waiting period
     private var lastErrorTime: Long = 0
     private val isRetrying = AtomicBoolean(false)
+    
+    // Sentence boundary detection patterns
+    private val sentenceEndPattern = Pattern.compile("[.!?]+\\s*")
+    private val sentenceBufferPattern = Pattern.compile("([.!?]+)\\s*")
 
     /**
      * Sends a message to the LLM and returns the response
@@ -90,6 +104,222 @@ class LlamaClient(private val retrofit: Retrofit) {
             lastErrorTime = System.currentTimeMillis()
             return@withContext Result.failure(e)
         }
+    }
+
+    /**
+     * Sends a streaming message and returns a Flow of streaming chunks
+     */
+    suspend fun sendStreamingMessage(
+        message: String,
+        context: ConversationContext? = null,
+        systemPrompt: String = DEFAULT_SYSTEM_PROMPT
+    ): Flow<StreamingChunk> = flow {
+        try {
+            // Check if we need to wait after an error
+            val currentTime = System.currentTimeMillis()
+            if (currentTime - lastErrorTime < 60000 && lastErrorTime > 0) {
+                val waitTimeRemaining = 60000 - (currentTime - lastErrorTime)
+                if (waitTimeRemaining > 0 && !isRetrying.getAndSet(true)) {
+                    try {
+                        delay(waitTimeRemaining)
+                    } finally {
+                        isRetrying.set(false)
+                    }
+                }
+            }
+            
+            // Prepare the full prompt with memory and conversation history
+            val fullSystemPrompt = buildEnhancedSystemPrompt(
+                systemPrompt,
+                context?.memoryFacts,
+                context?.recentMessages
+            )
+
+            val request = OllamaRequest(
+                model = BuildConfig.LLAMA_MODEL_NAME,
+                prompt = message,
+                system = fullSystemPrompt,
+                stream = true,
+                options = OllamaOptions(
+                    temperature = 0.7f,
+                    maxTokens = 800
+                ),
+                keep_alive = 3600
+            )
+
+            val response = ollamaService.generateStreamingCompletion(request)
+            if (response.isSuccessful) {
+                lastErrorTime = 0
+                
+                response.body()?.let { responseBody ->
+                    val source = responseBody.source()
+                    
+                    while (!source.exhausted()) {
+                        try {
+                            val line = source.readUtf8Line()
+                            if (!line.isNullOrBlank()) {
+                                val streamingResponse = gson.fromJson(line, StreamingResponse::class.java)
+                                
+                                val chunk = StreamingChunk(
+                                    content = streamingResponse.response,
+                                    isDone = streamingResponse.done,
+                                    metadata = mapOf(
+                                        "model" to streamingResponse.model,
+                                        "created_at" to streamingResponse.createdAt
+                                    )
+                                )
+                                
+                                emit(chunk)
+                                
+                                if (streamingResponse.done) break
+                            }
+                        } catch (e: Exception) {
+                            emit(StreamingChunk(
+                                content = "",
+                                isDone = true,
+                                isError = true,
+                                errorMessage = "Error parsing stream: ${e.message}"
+                            ))
+                            break
+                        }
+                    }
+                } ?: run {
+                    emit(StreamingChunk(
+                        content = "",
+                        isDone = true,
+                        isError = true,
+                        errorMessage = "Empty response body"
+                    ))
+                }
+            } else {
+                lastErrorTime = System.currentTimeMillis()
+                emit(StreamingChunk(
+                    content = "",
+                    isDone = true,
+                    isError = true,
+                    errorMessage = "API error: ${response.code()} ${response.message()}"
+                ))
+            }
+        } catch (e: Exception) {
+            lastErrorTime = System.currentTimeMillis()
+            emit(StreamingChunk(
+                content = "",
+                isDone = true,
+                isError = true,
+                errorMessage = "Network error: ${e.message}"
+            ))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    /**
+     * Sends a streaming message with sentence buffering for voice integration
+     */
+    suspend fun sendStreamingMessageWithSentenceBuffer(
+        message: String,
+        context: ConversationContext? = null,
+        systemPrompt: String = DEFAULT_SYSTEM_PROMPT
+    ): Flow<StreamingChunk> = flow {
+        var sentenceBuffer = StringBuilder()
+        var fullResponse = StringBuilder()
+        
+        sendStreamingMessage(message, context, systemPrompt).collect { chunk ->
+            if (chunk.isError) {
+                emit(chunk)
+                return@collect
+            }
+            
+            if (chunk.content.isNotEmpty()) {
+                sentenceBuffer.append(chunk.content)
+                fullResponse.append(chunk.content)
+                
+                // Check for sentence boundaries
+                val sentences = extractCompleteSentences(sentenceBuffer.toString())
+                
+                if (sentences.isNotEmpty()) {
+                    // Emit complete sentences
+                    sentences.forEach { sentence ->
+                        emit(StreamingChunk(
+                            content = sentence,
+                            isDone = false,
+                            metadata = mapOf(
+                                "type" to "sentence",
+                                "full_response_so_far" to fullResponse.toString()
+                            )
+                        ))
+                    }
+                    
+                    // Keep only the incomplete part
+                    val lastSentenceEnd = findLastSentenceEnd(sentenceBuffer.toString())
+                    if (lastSentenceEnd > 0) {
+                        sentenceBuffer = StringBuilder(sentenceBuffer.substring(lastSentenceEnd).trim())
+                    }
+                }
+            }
+            
+            if (chunk.isDone) {
+                // Emit any remaining content as the final sentence
+                if (sentenceBuffer.isNotEmpty()) {
+                    emit(StreamingChunk(
+                        content = sentenceBuffer.toString().trim(),
+                        isDone = false,
+                        metadata = mapOf(
+                            "type" to "final_sentence",
+                            "full_response" to fullResponse.toString()
+                        )
+                    ))
+                }
+                
+                // Emit completion signal
+                emit(StreamingChunk(
+                    content = "",
+                    isDone = true,
+                    metadata = mapOf(
+                        "type" to "completion",
+                        "full_response" to fullResponse.toString()
+                    )
+                ))
+            }
+        }
+    }.flowOn(Dispatchers.IO)
+
+    /**
+     * Extract complete sentences from text buffer
+     */
+    private fun extractCompleteSentences(text: String): List<String> {
+        val sentences = mutableListOf<String>()
+        val matcher = sentenceEndPattern.matcher(text)
+        var lastEnd = 0
+        
+        while (matcher.find()) {
+            val sentence = text.substring(lastEnd, matcher.end()).trim()
+            if (sentence.isNotEmpty()) {
+                sentences.add(sentence)
+            }
+            lastEnd = matcher.end()
+        }
+        
+        return sentences
+    }
+
+    /**
+     * Find the position after the last complete sentence
+     */
+    private fun findLastSentenceEnd(text: String): Int {
+        val matcher = sentenceEndPattern.matcher(text)
+        var lastEnd = 0
+        
+        while (matcher.find()) {
+            lastEnd = matcher.end()
+        }
+        
+        return lastEnd
+    }
+
+    /**
+     * Check if text contains sentence boundaries
+     */
+    fun hasSentenceBoundary(text: String): Boolean {
+        return sentenceEndPattern.matcher(text).find()
     }
 
     /**
@@ -235,6 +465,5 @@ class LlamaClient(private val retrofit: Retrofit) {
 
             Astra must function reliably, adapt silently, and follow these behavioral constraints without exception.
             """
-
     }
 }

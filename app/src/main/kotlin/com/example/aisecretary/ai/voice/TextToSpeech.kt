@@ -3,13 +3,14 @@ package com.example.aisecretary.ai.voice
 import android.content.Context
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.util.*
 
 /**
- * Manages Text-to-Speech functionality for the app.
+ * Enhanced Text-to-Speech manager with queue support and streaming integration
  */
 class TextToSpeechManager(
     context: Context
@@ -17,6 +18,9 @@ class TextToSpeechManager(
     private var textToSpeech: TextToSpeech? = null
     private val _ttsState = MutableStateFlow<TtsState>(TtsState.Idle)
     val ttsState: StateFlow<TtsState> = _ttsState.asStateFlow()
+    
+    private var utteranceCounter = 0
+    private val utteranceQueue = mutableListOf<String>()
 
     init {
         textToSpeech = TextToSpeech(context) { status ->
@@ -40,54 +44,125 @@ class TextToSpeechManager(
         textToSpeech?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String?) {
                 _ttsState.value = TtsState.Speaking
+                Log.d("TTS", "Started speaking: $utteranceId")
             }
 
             override fun onDone(utteranceId: String?) {
                 _ttsState.value = TtsState.Ready
+                Log.d("TTS", "Finished speaking: $utteranceId")
+                
+                // Process next item in queue if any
+                processQueue()
             }
 
-            @Deprecated("Deprecated in Java")
             override fun onError(utteranceId: String?) {
                 _ttsState.value = TtsState.Error("Error during speech")
+                Log.e("TTS", "TTS Error for utterance: $utteranceId")
             }
 
-            override fun onError(utteranceId: String?, errorCode: Int) {
-                super.onError(utteranceId, errorCode)
-                _ttsState.value = TtsState.Error("Error code: $errorCode")
+            override fun onStop(utteranceId: String?, interrupted: Boolean) {
+                _ttsState.value = TtsState.Ready
+                Log.d("TTS", "TTS stopped, interrupted: $interrupted")
             }
         })
     }
 
-    fun speak(text: String) {
-        if (_ttsState.value is TtsState.Ready) {
-            val utteranceId = UUID.randomUUID().toString()
-            textToSpeech?.speak(
+    enum class QueueMode {
+        FLUSH,    // Clear queue and speak immediately
+        QUEUE_ADD // Add to queue
+    }
+
+    fun speak(text: String, queueMode: QueueMode = QueueMode.FLUSH) {
+        if (text.isBlank()) return
+        
+        val utteranceId = "utterance_${++utteranceCounter}"
+        
+        when (queueMode) {
+            QueueMode.FLUSH -> {
+                // Clear queue and speak immediately
+                utteranceQueue.clear()
+                stop()
+                speakImmediately(text, utteranceId)
+            }
+            QueueMode.QUEUE_ADD -> {
+                // Add to queue for sequential playback
+                if (_ttsState.value == TtsState.Speaking) {
+                    utteranceQueue.add(text)
+                } else {
+                    speakImmediately(text, utteranceId)
+                }
+            }
+        }
+    }
+
+    private fun speakImmediately(text: String, utteranceId: String) {
+        try {
+            val result = textToSpeech?.speak(
                 text,
                 TextToSpeech.QUEUE_FLUSH,
                 null,
                 utteranceId
             )
+            
+            if (result == TextToSpeech.ERROR) {
+                _ttsState.value = TtsState.Error("Failed to start speech")
+                Log.e("TTS", "Failed to speak text: $text")
+            }
+        } catch (e: Exception) {
+            _ttsState.value = TtsState.Error("Exception during speech: ${e.message}")
+            Log.e("TTS", "Exception during TTS", e)
+        }
+    }
+
+    private fun processQueue() {
+        if (utteranceQueue.isNotEmpty()) {
+            val nextText = utteranceQueue.removeFirst()
+            val utteranceId = "utterance_${++utteranceCounter}"
+            speakImmediately(nextText, utteranceId)
         }
     }
 
     fun stop() {
-        textToSpeech?.stop()
-        _ttsState.value = TtsState.Ready
+        try {
+            utteranceQueue.clear()
+            textToSpeech?.stop()
+            _ttsState.value = TtsState.Ready
+        } catch (e: Exception) {
+            Log.e("TTS", "Error stopping TTS", e)
+        }
+    }
+
+    fun pause() {
+        try {
+            textToSpeech?.stop()
+            _ttsState.value = TtsState.Paused
+        } catch (e: Exception) {
+            Log.e("TTS", "Error pausing TTS", e)
+        }
+    }
+
+    fun setSpeechRate(rate: Float) {
+        textToSpeech?.setSpeechRate(rate.coerceIn(0.1f, 3.0f))
+    }
+
+    fun setPitch(pitch: Float) {
+        textToSpeech?.setPitch(pitch.coerceIn(0.1f, 2.0f))
+    }
+
+    fun isSpeaking(): Boolean {
+        return textToSpeech?.isSpeaking == true
     }
 
     fun shutdown() {
-        textToSpeech?.stop()
+        stop()
         textToSpeech?.shutdown()
-        textToSpeech = null
     }
-}
 
-/**
- * Represents different states of text-to-speech operations.
- */
-sealed class TtsState {
-    object Idle : TtsState()
-    object Ready : TtsState()
-    object Speaking : TtsState()
-    data class Error(val message: String) : TtsState()
+    sealed class TtsState {
+        object Idle : TtsState()
+        object Ready : TtsState()
+        object Speaking : TtsState()
+        object Paused : TtsState()
+        data class Error(val message: String) : TtsState()
+    }
 }
