@@ -1,0 +1,11 @@
+package com.example.aisecretary
+
+import com.example.aisecretary.utils.Logger
+import android.app.Application
+
+class MyApplication : Application() {
+    override fun onCreate() {
+        super.onCreate()
+        Logger.init(this)
+        Logger.i("AppStart", "Core", "Logger initialized successfully")
+    }
