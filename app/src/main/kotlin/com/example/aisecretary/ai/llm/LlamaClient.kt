@@ -12,6 +12,7 @@ import kotlinx.coroutines.withContext
 import retrofit2.Retrofit
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicBoolean
+import com.example.aisecretary.utils.Logger
 
 class LlamaClient(private val retrofit: Retrofit) {
 
@@ -47,6 +48,7 @@ class LlamaClient(private val retrofit: Retrofit) {
             }
             
             // Prepare the full prompt with memory and conversation history
+            Logger.d("LlamaClient", "LLM", "Sending message to LLM: $message")
             val fullSystemPrompt = buildEnhancedSystemPrompt(
                 systemPrompt, 
                 context?.memoryFacts,
@@ -72,6 +74,7 @@ class LlamaClient(private val retrofit: Retrofit) {
                 
                 val ollamaResponse = response.body()
                 if (ollamaResponse != null) {
+                    Logger.i("LlamaClient", "LLM", "LLM response received: ${ollamaResponse.response}")
                     return@withContext Result.success(ollamaResponse.response)
                 } else {
                     // Record error time
@@ -109,9 +112,11 @@ class LlamaClient(private val retrofit: Retrofit) {
                 Result.success(Unit)
             } else {
                 Result.failure(IOException("Failed to unload model: ${response.code()} ${response.message()}"))
+                Logger.e("LlamaClient", "LLM", "Failed to unload model: ${response.code()} ${response.message()}")
             }
         } catch (e: Exception) {
             return@withContext Result.failure(e)
+            Logger.e("LlamaClient", "LLM", "Exception while unloading model: ${e.message}")
         }
     }
 
