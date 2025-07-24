@@ -10,6 +10,9 @@
         <item name="colorSecondary">@color/secondaryColor</item>
         <item name="colorSecondaryVariant">@color/secondaryVariant</item>
         <item name="colorOnSecondary">@color/textOnSecondary</item>
+
+        <!-- Accent color -->
+        <item name="colorAccent">@color/accentColor</item>
         
         <!-- Status bar and navigation colors -->
         <item name="android:statusBarColor">@color/primaryVariant</item>
