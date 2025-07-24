@@ -4,6 +4,9 @@
     <color name="primaryColor">#4F46E5</color>
     <color name="primaryVariant">#3730A3</color>
     <color name="primaryLight">#818CF8</color>
+
+    <!-- Accent color picker default -->
+    <color name="accentColor">#FF4081</color>
     
     <!-- Secondary accent colors -->
     <color name="secondaryColor">#0EA5E9</color>
