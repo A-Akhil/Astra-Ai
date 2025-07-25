@@ -14,5 +14,9 @@ data class MemoryFact(
     val id: Long = 0,
     val key: String,
     val value: String,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    val isReminder: Boolean = false,
+    val reminderTime: Long? = null,
+    val isCompleted: Boolean = false,
+    val reminderType: String? = null
 )
