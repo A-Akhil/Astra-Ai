@@ -29,6 +29,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val _autoActivateMicEnabled = MutableStateFlow(settingsManager.isAutoActivateMicEnabled())
     val autoActivateMicEnabled: StateFlow<Boolean> = _autoActivateMicEnabled.asStateFlow()
     
+    private val _darkModeEnabled = MutableStateFlow(settingsManager.isDarkModeEnabled())
+    val darkModeEnabled: StateFlow<Boolean> = _darkModeEnabled.asStateFlow()
+    
     private val _settingsUpdated = MutableStateFlow(false)
     val settingsUpdated: StateFlow<Boolean> = _settingsUpdated.asStateFlow()
     
@@ -66,6 +69,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 _autoActivateMicEnabled.value = it
             }
         }
+
+        viewModelScope.launch {
+            settingsManager.darkModeEnabled.collectLatest {
+                _darkModeEnabled.value = it
+            }
+        }
     }
     
     fun setVoiceInputEnabled(enabled: Boolean) {
@@ -87,6 +96,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setAutoActivateMicEnabled(enabled: Boolean) {
         _autoActivateMicEnabled.value = enabled
     }
+
+    fun setDarkModeEnabled(enabled: Boolean) {
+        _darkModeEnabled.value = enabled
+    }
     
     fun saveSettings() {
         settingsManager.setVoiceOutputEnabled(_voiceInputEnabled.value)
@@ -94,6 +107,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         settingsManager.setMemoryEnabled(_memoryEnabled.value)
         settingsManager.setWakeWordEnabled(_wakeWordEnabled.value)
         settingsManager.setAutoActivateMicEnabled(_autoActivateMicEnabled.value)
+        settingsManager.setDarkModeEnabled(_darkModeEnabled.value)
         _settingsUpdated.value = true
     }
     
