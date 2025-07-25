@@ -36,6 +36,12 @@ class SettingsManager(context: Context) {
     )
     val autoActivateMic: StateFlow<Boolean> = _autoActivateMic.asStateFlow()
 
+    // Dark mode setting
+    private val _darkModeEnabled = MutableStateFlow(
+        preferences.getBoolean(KEY_DARK_MODE_ENABLED, false)
+    )
+    val darkModeEnabled: StateFlow<Boolean> = _darkModeEnabled.asStateFlow()
+
     fun isMemoryEnabled(): Boolean {
         return preferences.getBoolean(KEY_MEMORY_ENABLED, true)
     }
@@ -72,11 +78,21 @@ class SettingsManager(context: Context) {
         _autoActivateMic.value = enabled
     }
 
+    fun isDarkModeEnabled(): Boolean {
+        return preferences.getBoolean(KEY_DARK_MODE_ENABLED, false)
+    }
+
+    fun setDarkModeEnabled(enabled: Boolean) {
+        preferences.edit().putBoolean(KEY_DARK_MODE_ENABLED, enabled).apply()
+        _darkModeEnabled.value = enabled
+    }
+
     companion object {
         private const val PREFS_NAME = "secretary_settings"
         private const val KEY_MEMORY_ENABLED = "memory_enabled"
         private const val KEY_VOICE_OUTPUT_ENABLED = "voice_output_enabled"
         private const val KEY_WAKE_WORD_ENABLED = "wake_word_enabled"
         private const val KEY_AUTO_ACTIVATE_MIC = "auto_activate_mic"
+        private const val KEY_DARK_MODE_ENABLED = "dark_mode_enabled"
     }
 } 
