@@ -4,6 +4,9 @@ import android.content.Context
 import android.speech.tts.TextToSpeech
 import com.example.aisecretary.BuildConfig
 import com.example.aisecretary.SecretaryApplication
+import com.example.aisecretary.ai.device.DeviceControlManager
+import com.example.aisecretary.ai.device.DevicePermissionManager
+import com.example.aisecretary.ai.device.DeviceVoiceProcessor
 import com.example.aisecretary.data.local.database.AppDatabase
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -41,5 +44,20 @@ object AppModule {
     // Text-to-Speech
     fun provideTextToSpeech(context: Context, listener: TextToSpeech.OnInitListener): TextToSpeech {
         return TextToSpeech(context, listener)
+    }
+    
+    // Device Control Manager
+    fun provideDeviceControlManager(context: Context): DeviceControlManager {
+        return DeviceControlManager(context)
+    }
+    
+    // Device Permission Manager
+    fun provideDevicePermissionManager(context: Context): DevicePermissionManager {
+        return DevicePermissionManager(context)
+    }
+    
+    // Device Voice Processor
+    fun provideDeviceVoiceProcessor(context: Context): DeviceVoiceProcessor {
+        return DeviceVoiceProcessor(context)
     }
 }

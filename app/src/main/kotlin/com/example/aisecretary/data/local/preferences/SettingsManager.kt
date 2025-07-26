@@ -26,6 +26,13 @@ class SettingsManager(context: Context) {
     private val _voiceOutputEnabled = MutableStateFlow(isVoiceOutputEnabled())
     val voiceOutputEnabled: Flow<Boolean> = _voiceOutputEnabled.asStateFlow()
     
+    // Device control settings
+    private val _deviceControlEnabled = MutableStateFlow(isDeviceControlEnabled())
+    val deviceControlEnabled: Flow<Boolean> = _deviceControlEnabled.asStateFlow()
+    
+    private val _deviceControlConfirmationRequired = MutableStateFlow(isDeviceControlConfirmationRequired())
+    val deviceControlConfirmationRequired: Flow<Boolean> = _deviceControlConfirmationRequired.asStateFlow()
+    
     // Memory settings
     fun isMemoryEnabled(): Boolean {
         return sharedPrefs.getBoolean(KEY_MEMORY_ENABLED, true)
@@ -56,10 +63,31 @@ class SettingsManager(context: Context) {
         _voiceOutputEnabled.value = enabled
     }
     
+    // Device control settings
+    fun isDeviceControlEnabled(): Boolean {
+        return sharedPrefs.getBoolean(KEY_DEVICE_CONTROL_ENABLED, true)
+    }
+    
+    fun setDeviceControlEnabled(enabled: Boolean) {
+        sharedPrefs.edit().putBoolean(KEY_DEVICE_CONTROL_ENABLED, enabled).apply()
+        _deviceControlEnabled.value = enabled
+    }
+    
+    fun isDeviceControlConfirmationRequired(): Boolean {
+        return sharedPrefs.getBoolean(KEY_DEVICE_CONTROL_CONFIRMATION_REQUIRED, true)
+    }
+    
+    fun setDeviceControlConfirmationRequired(required: Boolean) {
+        sharedPrefs.edit().putBoolean(KEY_DEVICE_CONTROL_CONFIRMATION_REQUIRED, required).apply()
+        _deviceControlConfirmationRequired.value = required
+    }
+    
     companion object {
         private const val PREFS_NAME = "ai_secretary_prefs"
         private const val KEY_MEMORY_ENABLED = "memory_enabled"
         private const val KEY_VOICE_INPUT_ENABLED = "voice_input_enabled"
         private const val KEY_VOICE_OUTPUT_ENABLED = "voice_output_enabled"
+        private const val KEY_DEVICE_CONTROL_ENABLED = "device_control_enabled"
+        private const val KEY_DEVICE_CONTROL_CONFIRMATION_REQUIRED = "device_control_confirmation_required"
     }
 }
