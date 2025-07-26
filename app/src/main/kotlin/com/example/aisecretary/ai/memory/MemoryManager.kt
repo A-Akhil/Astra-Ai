@@ -25,6 +25,38 @@ class MemoryManager(
         Pattern.compile("(?i)my (.+?) (?:is|are) (.+)")
     )
     
+    // Device control patterns for voice recognition
+    private val deviceControlPatterns = listOf(
+        // Brightness patterns
+        Pattern.compile("(?i)set brightness to (\\d+)%?"),
+        Pattern.compile("(?i)brightness (\\d+)%?"),
+        Pattern.compile("(?i)set screen brightness to (\\d+)%?"),
+        Pattern.compile("(?i)adjust brightness to (\\d+)%?"),
+        
+        // Volume patterns
+        Pattern.compile("(?i)set volume to (\\d+)%?"),
+        Pattern.compile("(?i)volume (\\d+)%?"),
+        Pattern.compile("(?i)set audio volume to (\\d+)%?"),
+        Pattern.compile("(?i)adjust volume to (\\d+)%?"),
+        Pattern.compile("(?i)(increase|decrease|turn up|turn down) volume (?:by )?(\\d+)?%?"),
+        Pattern.compile("(?i)(raise|lower) volume (?:by )?(\\d+)?%?"),
+        Pattern.compile("(?i)volume (up|down)(?: by (\\d+))?%?"),
+        
+        // WiFi patterns
+        Pattern.compile("(?i)(turn on|enable|switch on) (?:the )?wifi"),
+        Pattern.compile("(?i)(turn off|disable|switch off) (?:the )?wifi"),
+        Pattern.compile("(?i)wifi (on|off)"),
+        
+        // Bluetooth patterns
+        Pattern.compile("(?i)(turn on|enable|switch on) (?:the )?bluetooth"),
+        Pattern.compile("(?i)(turn off|disable|switch off) (?:the )?bluetooth"),
+        Pattern.compile("(?i)bluetooth (on|off)"),
+        
+        // Status patterns
+        Pattern.compile("(?i)(what is|check|show) (?:the )?(brightness|volume|wifi|bluetooth) (?:status|level)?"),
+        Pattern.compile("(?i)(brightness|volume|wifi|bluetooth) (?:status|level|info)")
+    )
+    
     // Pattern to detect JSON objects in text
     private val jsonPattern = Pattern.compile("\\{(?:[^{}]|\\{[^{}]*\\})*\\}")
 
@@ -194,6 +226,40 @@ class MemoryManager(
     suspend fun clearAllMemory() {
         memoryFactDao.deleteAllMemoryFacts()
     }
+    
+    /**
+     * Detect if a message contains device control commands
+     */
+    fun isDeviceControlCommand(message: String): Boolean {
+        return deviceControlPatterns.any { pattern ->
+            pattern.matcher(message).find()
+        }
+    }
+    
+    /**
+     * Get device control command type from message
+     */
+    fun getDeviceControlCommandType(message: String): DeviceControlType? {
+        val lowerMessage = message.lowercase()
+        
+        return when {
+            lowerMessage.contains("brightness") -> DeviceControlType.BRIGHTNESS
+            lowerMessage.contains("volume") -> DeviceControlType.VOLUME
+            lowerMessage.contains("wifi") -> DeviceControlType.WIFI
+            lowerMessage.contains("bluetooth") -> DeviceControlType.BLUETOOTH
+            else -> null
+        }
+    }
+}
+
+/**
+ * Types of device control commands
+ */
+enum class DeviceControlType {
+    BRIGHTNESS,
+    VOLUME,
+    WIFI,
+    BLUETOOTH
 }
 
 data class MemoryDetectionResult(

@@ -6,6 +6,11 @@ import androidx.lifecycle.viewModelScope
 import com.example.aisecretary.SecretaryApplication
 import com.example.aisecretary.ai.llm.LlamaClient
 import com.example.aisecretary.ai.memory.MemoryManager
+import com.example.aisecretary.ai.memory.DeviceControlType
+import com.example.aisecretary.ai.device.DeviceVoiceProcessor
+import com.example.aisecretary.ai.device.DevicePermissionManager
+import com.example.aisecretary.ai.device.DeviceStatusMonitor
+import com.example.aisecretary.ai.device.DeviceCommandResult
 import com.example.aisecretary.data.local.database.AppDatabase
 import com.example.aisecretary.data.model.Message
 import com.example.aisecretary.data.repository.ChatRepository
@@ -44,6 +49,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     // Settings manager
     private val settingsManager = SettingsManager(getApplication())
+    
+    // Device control components
+    private val deviceVoiceProcessor = AppModule.provideDeviceVoiceProcessor(getApplication())
+    private val devicePermissionManager = AppModule.provideDevicePermissionManager(getApplication())
+    private val deviceStatusMonitor = DeviceStatusMonitor(getApplication())
 
     // Messages in the chat
     private val _messages = MutableStateFlow<List<Message>>(emptyList())
@@ -60,6 +70,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     // Speech events
     private val _speechEvents = MutableSharedFlow<SpeechEvent>()
     val speechEvents: SharedFlow<SpeechEvent> = _speechEvents.asSharedFlow()
+    
+    // Device control events
+    private val _deviceControlEvents = MutableSharedFlow<DeviceControlEvent>()
+    val deviceControlEvents: SharedFlow<DeviceControlEvent> = _deviceControlEvents.asSharedFlow()
 
     // Message queue for TTS
     private val messageQueue: Queue<Message> = LinkedList()
@@ -265,53 +279,114 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 chatRepository.saveMessage(userMessage)
                 _currentInput.value = ""
                 
-                // Check if this is the first request
-                if (isFirstRequest) {
-                    _uiState.value = UiState.Processing(isInitialRequest = true)
-                    _speechEvents.emit(SpeechEvent.InitialRequestStarted)
+                // Check if this is a device control command first
+                if (memoryManager.isDeviceControlCommand(inputText)) {
+                    processDeviceControlCommand(inputText)
                 } else {
-                    _uiState.value = UiState.Processing(isInitialRequest = false)
+                    // Process as regular chat message
+                    processChatMessage(inputText)
                 }
-
-                chatRepository.processUserMessage(inputText).fold(
-                    onSuccess = { response ->
-                        val assistantMessage = Message(
-                            content = response,
-                            isFromUser = false
-                        )
-
-                        chatRepository.saveMessage(assistantMessage)
-
-                        if (isFirstRequest) {
-                            isFirstRequest = false
-                            _speechEvents.emit(SpeechEvent.InitialRequestCompleted)
-                        }
-
-                        // Emit event for new message received
-                        _speechEvents.emit(SpeechEvent.NewMessageReceived(assistantMessage))
-                        
-                        _uiState.value = UiState.Ready
-                    },
-                    onFailure = { error ->
-                        if (isFirstRequest) {
-                            isFirstRequest = false
-                            _speechEvents.emit(SpeechEvent.InitialRequestCompleted)
-                        }
-                        
-                        _uiState.value = UiState.Error("Error: ${error.message}")
-
-                        val errorMessage = Message(
-                            content = "Sorry, I encountered a problem. Please try again.",
-                            isFromUser = false
-                        )
-                        chatRepository.saveMessage(errorMessage)
-                        
-                        // Still try to read the error message
-                        _speechEvents.emit(SpeechEvent.NewMessageReceived(errorMessage))
-                    }
-                )
             }
         }
+    }
+    
+    private suspend fun processDeviceControlCommand(inputText: String) {
+        // Check permissions first
+        if (!devicePermissionManager.hasAllRequiredPermissions()) {
+            val missingPermissions = devicePermissionManager.getMissingPermissions()
+            val permissionMessage = Message(
+                content = "Device control requires additional permissions. Please grant the necessary permissions in settings.",
+                isFromUser = false
+            )
+            chatRepository.saveMessage(permissionMessage)
+            _deviceControlEvents.emit(DeviceControlEvent.PermissionRequired(missingPermissions))
+            _uiState.value = UiState.Ready
+            return
+        }
+        
+        // Process device control command
+        val result = deviceVoiceProcessor.processVoiceCommand(inputText)
+        
+        when (result) {
+            is DeviceCommandResult.Success -> {
+                val successMessage = Message(
+                    content = result.message,
+                    isFromUser = false
+                )
+                chatRepository.saveMessage(successMessage)
+                _deviceControlEvents.emit(DeviceControlEvent.CommandExecuted(result.message))
+            }
+            is DeviceCommandResult.Error -> {
+                val errorMessage = Message(
+                    content = "Device control error: ${result.message}",
+                    isFromUser = false
+                )
+                chatRepository.saveMessage(errorMessage)
+                _deviceControlEvents.emit(DeviceControlEvent.CommandError(result.message))
+            }
+            is DeviceCommandResult.RequiresUserAction -> {
+                val actionMessage = Message(
+                    content = result.message,
+                    isFromUser = false
+                )
+                chatRepository.saveMessage(actionMessage)
+                _deviceControlEvents.emit(DeviceControlEvent.UserActionRequired(result.message, result.intent))
+            }
+            is DeviceCommandResult.NoMatch -> {
+                // Fall back to regular chat processing
+                processChatMessage(inputText)
+            }
+        }
+        
+        _uiState.value = UiState.Ready
+    }
+    
+    private suspend fun processChatMessage(inputText: String) {
+        // Check if this is the first request
+        if (isFirstRequest) {
+            _uiState.value = UiState.Processing(isInitialRequest = true)
+            _speechEvents.emit(SpeechEvent.InitialRequestStarted)
+        } else {
+            _uiState.value = UiState.Processing(isInitialRequest = false)
+        }
+
+        chatRepository.processUserMessage(inputText).fold(
+            onSuccess = { response ->
+                val assistantMessage = Message(
+                    content = response,
+                    isFromUser = false
+                )
+
+                chatRepository.saveMessage(assistantMessage)
+
+                if (isFirstRequest) {
+                    isFirstRequest = false
+                    _speechEvents.emit(SpeechEvent.InitialRequestCompleted)
+                }
+
+                // Emit event for new message received
+                _speechEvents.emit(SpeechEvent.NewMessageReceived(assistantMessage))
+                
+                _uiState.value = UiState.Ready
+            },
+            onFailure = { error ->
+                if (isFirstRequest) {
+                    isFirstRequest = false
+                    _speechEvents.emit(SpeechEvent.InitialRequestCompleted)
+                }
+                
+                _uiState.value = UiState.Error("Error: ${error.message}")
+
+                val errorMessage = Message(
+                    content = "Sorry, I encountered a problem. Please try again.",
+                    isFromUser = false
+                )
+                chatRepository.saveMessage(errorMessage)
+                
+                // Still try to read the error message
+                _speechEvents.emit(SpeechEvent.NewMessageReceived(errorMessage))
+            }
+        )
     }
     
     fun clearConversation() {
@@ -356,6 +431,48 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
+    
+    /**
+     * Get device status report
+     */
+    fun getDeviceStatusReport(): String {
+        return deviceStatusMonitor.getDeviceStatusReport()
+    }
+    
+    /**
+     * Get device status for a specific type
+     */
+    fun getDeviceStatus(deviceType: DeviceControlType): String {
+        return deviceStatusMonitor.getStatusDescription(deviceType)
+    }
+    
+    /**
+     * Get optimal settings recommendations
+     */
+    fun getOptimalSettingsRecommendations(): List<String> {
+        return deviceStatusMonitor.getOptimalSettingsRecommendations()
+    }
+    
+    /**
+     * Refresh device status
+     */
+    fun refreshDeviceStatus() {
+        deviceStatusMonitor.refreshAllStatus()
+    }
+    
+    /**
+     * Check if device control is available
+     */
+    fun isDeviceControlAvailable(): Boolean {
+        return devicePermissionManager.hasAllRequiredPermissions()
+    }
+    
+    /**
+     * Get missing permissions
+     */
+    fun getMissingPermissions(): List<com.example.aisecretary.ai.device.PermissionInfo> {
+        return devicePermissionManager.getMissingPermissions()
+    }
 }
 
 sealed class UiState {
@@ -374,4 +491,11 @@ sealed class SpeechEvent {
     object InitialRequestCompleted : SpeechEvent()
     object SpeakingCompleted : SpeechEvent()
     object WakeWordDetected : SpeechEvent()
+}
+
+sealed class DeviceControlEvent {
+    data class PermissionRequired(val missingPermissions: List<com.example.aisecretary.ai.device.PermissionInfo>) : DeviceControlEvent()
+    data class CommandExecuted(val message: String) : DeviceControlEvent()
+    data class CommandError(val error: String) : DeviceControlEvent()
+    data class UserActionRequired(val message: String, val intent: android.content.Intent) : DeviceControlEvent()
 }
