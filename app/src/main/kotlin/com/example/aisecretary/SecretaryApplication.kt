@@ -12,12 +12,27 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
+/**
+ * This is the main Application class of the app.
+ *
+ * It runs once when the app starts and is used to:
+ * - Create one shared database for the whole app
+ * - Create one shared LlamaClient to use the AI model
+ * - Track if the app is in the foreground or background
+ * - Unload the AI model when the app is closing
+ */
+
 class SecretaryApplication : Application() {
-    
-    // Application scope for coroutines
+
+    /**
+     * A special background task scope for running work outside the UI.
+     */
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    
-    // Single instance of the database
+
+    /**
+     * Creates and gives access to the Room database.
+     * It only creates one copy and uses it everywhere.
+     */
     val database: AppDatabase by lazy {
         Room.databaseBuilder(
             applicationContext,
@@ -28,19 +43,24 @@ class SecretaryApplication : Application() {
         .fallbackToDestructiveMigration() // This will wipe data if migration fails, but prevents crashes
         .build()
     }
-    
-    // LlamaClient for global access (to unload model if needed)
+
+    /**
+     * Creates and gives access to the LlamaClient which talks to the AI model.
+     */
     val llamaClient: LlamaClient by lazy {
         LlamaClient(AppModule.provideRetrofit())
     }
-    
-    // Track if any activities are running
+
+    /**
+     * Keeps track of how many activities (screens) are open.
+     */
     private var runningActivities = 0
     
     override fun onCreate() {
         super.onCreate()
-        
-        // Register to track activity lifecycle to know when app is truly in background
+
+        // This checks when an activity (screen) starts, stops, or ends
+        // and helps us know when the app goes to background or is closing
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
             override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
             
@@ -54,9 +74,8 @@ class SecretaryApplication : Application() {
             override fun onActivityStopped(activity: Activity) {
                 runningActivities--
                 if (runningActivities <= 0) {
-                    // No activities running - app is in background
-                    // We could unload model here, but it's better to keep it for the 60-minute keep_alive
-                    // as set in LlamaClient to allow quick resume
+                    // App is in background (no screen visible)
+                    // We could unload the model later if needed
                 }
             }
             
@@ -70,7 +89,10 @@ class SecretaryApplication : Application() {
             }
         })
     }
-    
+    /**
+     * This removes the AI model from memory in the background
+     * to free up space when the app is closing.
+     */
     private fun unloadModel() {
         applicationScope.launch {
             llamaClient.unloadModel()
