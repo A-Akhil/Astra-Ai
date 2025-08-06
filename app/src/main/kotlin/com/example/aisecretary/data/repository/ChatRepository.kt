@@ -8,20 +8,45 @@ import com.example.aisecretary.data.model.Message
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 
+/**
+ * Handles chat-related operations like saving messages,
+ * getting replies from the AI, and managing memory.
+ *
+ * @param messageDao Used to access and store messages in the database.
+ * @param llamaClient Sends user messages to the AI model and gets responses.
+ * @param memoryManager Handles memory detection and storage for user preferences or facts.
+ */
 class ChatRepository(
     private val messageDao: MessageDao,
     private val llamaClient: LlamaClient,
     private val memoryManager: MemoryManager
 ) {
-    // Get all messages from the database
+    /**
+     * Gets all saved messages from the database.
+     *
+     * @return A flow of message list (updates in real-time).
+     */
     fun getAllMessages(): Flow<List<Message>> = messageDao.getAllMessages()
 
-    // Save a message to the database
+    /**
+     * Saves a message to the database.
+     *
+     * @param message The message to save.
+     * @return The ID of the inserted message.
+     */
+
     suspend fun saveMessage(message: Message): Long {
         return messageDao.insertMessage(message)
     }
 
-    // Process a user message and get AI response
+    /**
+     * Sends the user's message to the AI and returns the reply.
+     * Also checks for memory-related instructions in the message or response.
+     *
+     * @param userMessage The user's input message.
+     * @param memoryEnabled Whether to use memory (default is true).
+     * @return The AI's response or an error.
+     */
     suspend fun processUserMessage(userMessage: String, memoryEnabled: Boolean = true): Result<String> {
         // Skip memory processing if disabled
         if (!memoryEnabled) {
@@ -42,7 +67,7 @@ class ChatRepository(
             return Result.success("I've remembered that ${memoryDetectionResult.memoryKey} is ${memoryDetectionResult.memoryValue}.")
         }
 
-        // If no memory request in user message, proceed with normal processing
+        // Get recent messages and related memory for better AI context
         val recentMessages = messageDao.getAllMessages().first().takeLast(10)
         val relevantMemory = memoryManager.getRelevantMemory(userMessage)
         
@@ -56,8 +81,8 @@ class ChatRepository(
             message = userMessage,
             context = context
         )
-        
-        // Check if the response contains a memory instruction (like JSON)
+
+        // Check if AI replied with memory-saving instructions
         if (llmResult.isSuccess) {
             val response = llmResult.getOrNull() ?: return llmResult
             
@@ -79,8 +104,14 @@ class ChatRepository(
         
         return llmResult
     }
-    
-    // Remove JSON blocks from the response to make it more readable
+
+    /**
+     * Cleans JSON blocks (used for memory saving) from the AI's response
+     * so it looks better when shown to the user.
+     *
+     * @param response The raw AI response.
+     * @return The cleaned response without JSON.
+     */
     private fun cleanJsonFromResponse(response: String): String {
         // Improve pattern to find JSON blocks, even with nested structures
         // This finds the outermost JSON object only
@@ -90,7 +121,9 @@ class ChatRepository(
             .trim()
     }
 
-    // Clear all messages
+    /**
+     * Deletes all messages from the database.
+     */
     suspend fun clearAllMessages() {
         messageDao.deleteAllMessages()
     }

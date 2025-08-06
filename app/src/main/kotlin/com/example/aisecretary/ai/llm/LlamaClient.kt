@@ -13,26 +13,53 @@ import retrofit2.Retrofit
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicBoolean
 
+/**
+ * A client for interacting with the Ollama-based AI backend using the LLaMA model.
+ *
+ * This class sends user messages to the AI, handles response processing,
+ * manages retry logic after failures, enhances prompts with memory and history,
+ * and can unload the model to free resources.
+ *
+ * Example usage:
+ * ```
+ * val client = LlamaClient(retrofit)
+ * val result = client.sendMessage("Tell me a joke.")
+ * result.onSuccess { println(it) }
+ * ```
+ *
+ * @param retrofit The Retrofit instance used to make API calls to the AI model server.
+ */
+
+
 class LlamaClient(private val retrofit: Retrofit) {
 
+    // Service interface for the Ollama API
     private val ollamaService: OllamaService by lazy {
         retrofit.create(OllamaService::class.java)
     }
-    
-    // Track the last error time to implement waiting period
+
+    // Keeps track of last time an error occurred
     private var lastErrorTime: Long = 0
+
+    // Prevents multiple retries from happening at the same time
     private val isRetrying = AtomicBoolean(false)
 
     /**
-     * Sends a message to the LLM and returns the response
+     * Sends a message to the AI and gets a reply.
+     *
+     * @param message The user's message or question.
+     * @param context (Optional) Extra info like memory or past conversation to help the AI give a better answer.
+     * @param systemPrompt (Optional) Special instructions to control how the AI should respond.
+     * @return A Result that has either the AI's reply or an error if something went wrong.
      */
+
     suspend fun sendMessage(
         message: String,
         context: ConversationContext? = null,
         systemPrompt: String = DEFAULT_SYSTEM_PROMPT
     ): Result<String> = withContext(Dispatchers.IO) {
         try {
-            // Check if we need to wait after an error
+            // If a recent error occurred, wait before retrying
             val currentTime = System.currentTimeMillis()
             if (currentTime - lastErrorTime < 60000 && lastErrorTime > 0) {
                 val waitTimeRemaining = 60000 - (currentTime - lastErrorTime)
@@ -45,14 +72,15 @@ class LlamaClient(private val retrofit: Retrofit) {
                     }
                 }
             }
-            
-            // Prepare the full prompt with memory and conversation history
+
+            // Build complete system prompt using memory and past conversation
             val fullSystemPrompt = buildEnhancedSystemPrompt(
                 systemPrompt, 
                 context?.memoryFacts,
                 context?.recentMessages
             )
 
+            // Create the API request
             val request = OllamaRequest(
                 model = BuildConfig.LLAMA_MODEL_NAME,
                 prompt = message,
@@ -93,7 +121,9 @@ class LlamaClient(private val retrofit: Retrofit) {
     }
 
     /**
-     * Unloads the model from memory
+     * Unloads the AI model from memory to free resources.
+     *
+     * @return A Result indicating success or failure of the unload action.
      */
     suspend fun unloadModel(): Result<Unit> = withContext(Dispatchers.IO) {
         try {
@@ -116,8 +146,19 @@ class LlamaClient(private val retrofit: Retrofit) {
     }
 
     /**
-     * Builds an enhanced system prompt that includes memory and recent conversation history
+     * Creates the full system prompt for the AI.
+     *
+     * It adds:
+     * - Basic instructions for how the AI should behave
+     * - Any saved memory facts
+     * - Recent messages from the user and AI
+     *
+     * @param systemPrompt The main instruction text for the AI.
+     * @param memoryFacts (Optional) A list of things the AI remembers about the user.
+     * @param recentMessages (Optional) A list of recent messages to give the AI context.
+     * @return A full prompt string to send to the AI.
      */
+
     private fun buildEnhancedSystemPrompt(
         systemPrompt: String,
         memoryFacts: List<MemoryFact>?,
@@ -157,6 +198,10 @@ class LlamaClient(private val retrofit: Retrofit) {
     }
 
     companion object {
+        /**
+         * Default system prompt that instructs the AI assistant on how to behave.
+         * It defines responsibilities, tone adjustment, memory rules, and formatting.
+         */
         const val DEFAULT_SYSTEM_PROMPT = """
             You are Astra, an intelligent AI assistant designed to help the user manage daily tasks, retrieve and recall important information, and provide contextual support with high accuracy and professionalism.
 
