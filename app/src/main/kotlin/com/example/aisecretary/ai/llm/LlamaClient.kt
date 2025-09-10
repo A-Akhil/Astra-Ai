@@ -34,8 +34,8 @@ class LlamaClient(private val retrofit: Retrofit) {
         try {
             // Check if we need to wait after an error
             val currentTime = System.currentTimeMillis()
-            if (currentTime - lastErrorTime < 60000 && lastErrorTime > 0) {
-                val waitTimeRemaining = 60000 - (currentTime - lastErrorTime)
+            if (currentTime - lastErrorTime < ERROR_COOLDOWN_PERIOD_MS && lastErrorTime > 0) {
+                val waitTimeRemaining = ERROR_COOLDOWN_PERIOD_MS - (currentTime - lastErrorTime)
                 if (waitTimeRemaining > 0 && !isRetrying.getAndSet(true)) {
                     try {
                         // Wait the remaining time of the 1-minute cooling period
@@ -157,6 +157,7 @@ class LlamaClient(private val retrofit: Retrofit) {
     }
 
     companion object {
+        private const val ERROR_COOLDOWN_PERIOD_MS = 60000L
         const val DEFAULT_SYSTEM_PROMPT = """
             You are Astra, an intelligent AI assistant designed to help the user manage daily tasks, retrieve and recall important information, and provide contextual support with high accuracy and professionalism.
 
