@@ -10,6 +10,18 @@ The AI Secretary App is an AI-powered personal secretary application designed to
 - User-friendly chat interface
 - Settings management for user preferences
 
+## Folder Overview 🗂️
+| Folder | Description |
+|---------|--------------|
+| `app/src/main/kotlin/com/example/aisecretary` | Core Kotlin app code |
+| `ui/chat` | Chat and messaging-related UI components |
+| `ai/llm` | Local LLM integration using Ollama |
+| `ai/memory` | Memory and context management |
+| `ai/rag` | Retrieval-Augmented Generation logic |
+| `data/local` | Local DB and preferences |
+| `ui/settings` | Settings and user configuration |
+
+
 ## Project Structure
 ```
 ai-secretary-app
@@ -83,6 +95,29 @@ ai-secretary-app
 ├── settings.gradle.kts
 └── README.md
 ```
+## Tech Stack 🧩
+
+**Languages & Frameworks**
+- Kotlin (Android)
+- XML (UI Design)
+- Java (Android interop)
+
+**AI & Backend**
+- LLaMA 3 via Ollama
+- RAG (Retrieval-Augmented Generation)
+- Local vector storage (FAISS / custom VectorStore)
+
+**Architecture**
+- MVVM pattern
+- Room Database
+- Dependency Injection using Hilt / Dagger
+- Coroutine-based async operations
+
+**Tools**
+- Android Studio
+- Gradle (KTS)
+- Git / GitHub
+
 
 ## Setup Instructions
 1. Clone the repository:
@@ -115,10 +150,34 @@ LLAMA_MODEL_NAME=llama3:8b
 - Access settings to customize your preferences.
 - The app will remember previous interactions to provide context-aware responses.
 
+## Community & Contribution Guidelines 💬
+
+We welcome contributions of all kinds:
+- 🐞 Bug fixes  
+- 💡 Feature suggestions  
+- 🧱 Documentation improvements  
+- 🧩 Code refactoring  
+
+**Before you start:**
+1. Comment on an open issue or create one to discuss your idea.
+2. Fork the repo and work on a separate branch.
+3. Follow commit message conventions (e.g., `feat:`, `fix:`, `docs:`).
+4. Submit a Pull Request with clear explanation.
+
+> 💡 Tip: Check the `Issues` tab for `good first issue` or `help wanted` labels.
+
 ## Contributing
 Contributions are welcome! Please submit a pull request or open an issue for any enhancements or bug fixes.
 
 [![Contributors](https://contrib.rocks/image?repo=A-Akhil/CertiMaster)](https://github.com/A-Akhil/CertiMaster/graphs/contributors)
+
+## Acknowledgements 🙌
+
+Special thanks to:
+- [A-Akhil](https://github.com/A-Akhil) for initiating the Astra-AI project.
+- The open-source community for inspiration and contributions.
+- LLaMA, Ollama, and Kotlin teams for enabling on-device AI development.
+
 
 ## License
 This project is licensed under the MIT License. See the LICENSE file for details.
