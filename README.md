@@ -4,7 +4,7 @@
 The AI Secretary App is an AI-powered personal secretary application designed to assist users with various tasks through voice and text interactions. It utilizes a local LLM (LLaMA 3 via Ollama) to provide intelligent responses and has memory-based context and retrieval-augmented generation (RAG) capabilities.
 
 ## Features
-- Voice and text input support
+- Voice  and text input support
 - Intelligent responses using LLaMA 3
 - Memory management for context-aware interactions
 - User-friendly chat interface
