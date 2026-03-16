@@ -16,7 +16,7 @@
         android:layout_marginStart="4dp"
         android:contentDescription="Assistant avatar"
         android:src="@drawable/ic_launcher_foreground"
-        android:tint="@color/primaryColor"
+        app:tint="@color/primaryColor"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
@@ -30,7 +30,7 @@
         android:padding="14dp"
         android:textColor="@color/assistantMessageText"
         android:textSize="15sp"
-        app:layout_constraintStart_toEndOf="@+id/avatarImage"
+        android:textIsSelectable="true" app:layout_constraintStart_toEndOf="@+id/avatarImage"
         app:layout_constraintTop_toTopOf="parent"
         tools:text="This is a sample assistant message that demonstrates how the bubble will look with a longer text." />
 
@@ -38,12 +38,10 @@
         android:id="@+id/messageTimestamp"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="8dp"
         android:layout_marginTop="4dp"
         android:textColor="@color/textTertiary"
         android:textSize="11sp"
-        app:layout_constraintStart_toEndOf="@+id/avatarImage"
-        app:layout_constraintTop_toBottomOf="@+id/messageText"
+        app:layout_constraintStart_toStartOf="@+id/messageText" app:layout_constraintTop_toBottomOf="@+id/messageText"
         tools:text="10:46 AM" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
