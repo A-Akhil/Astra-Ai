@@ -25,6 +25,15 @@ class MemoryManager(
         Pattern.compile("(?i)my (.+?) (?:is|are) (.+)")
     )
     
+    // Patterns to detect reminder statements
+    private val reminderPatterns = listOf(
+        Pattern.compile("(?i)remind me (?:at|in) (.+?) to (.+)"),
+        Pattern.compile("(?i)set reminder (?:for|at) (.+?) (?:to|for) (.+)"),
+        Pattern.compile("(?i)alert me (?:at|in) (.+?) about (.+)"),
+        Pattern.compile("(?i)remind me (.+?) (?:to|for) (.+)"),
+        Pattern.compile("(?i)can you remind me (?:at|in) (.+?) to (.+)")
+    )
+    
     // Pattern to detect JSON objects in text
     private val jsonPattern = Pattern.compile("\\{(?:[^{}]|\\{[^{}]*\\})*\\}")
 
