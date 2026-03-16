@@ -118,7 +118,7 @@ LLAMA_MODEL_NAME=llama3:8b
 ## Contributing
 Contributions are welcome! Please submit a pull request or open an issue for any enhancements or bug fixes.
 
-[![Contributors](https://contrib.rocks/image?repo=A-Akhil/CertiMaster)](https://github.com/A-Akhil/CertiMaster/graphs/contributors)
+[![Contributors](https://contrib.rocks/image?repo=A-Akhil/Astra-Ai)](https://github.com/A-Akhil/Astra-Ai/graphs/contributors)
 
 ## License
 This project is licensed under the MIT License. See the LICENSE file for details.
