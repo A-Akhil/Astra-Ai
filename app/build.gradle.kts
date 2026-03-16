@@ -102,6 +102,9 @@ dependencies {
     implementation("com.github.bumptech.glide:glide:4.15.0")
     implementation("androidx.navigation:navigation-fragment-ktx:2.7.2")
     implementation("androidx.navigation:navigation-ui-ktx:2.7.2")
+
+    // Adding Color Picker dependency here
+    implementation("com.github.QuadFlask:colorpicker:0.0.13")
     
     // Testing
     testImplementation("junit:junit:4.13.2")
