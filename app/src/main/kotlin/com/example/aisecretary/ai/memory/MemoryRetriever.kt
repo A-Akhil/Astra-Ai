@@ -5,12 +5,37 @@ import com.example.aisecretary.data.model.Message
 import java.util.*
 
 /**
- * Provides more advanced retrieval functionality for memory facts
+ * `MemoryRetriever` is responsible for fetching the most relevant memory facts from a given list
+ * based on a user query and optional recent conversation context.
+ *
+ * It uses a simple scoring algorithm that considers:
+ * - Keyword overlap between memory facts and the query
+ * - Recent message content for contextual weighting
+ * - Exact keyword matches for boosting score
+ *
+ * This retriever can be used in an AI assistant to simulate memory recall.
+ *
+ * ### Example Usage:
+ * ```
+ * val retriever = MemoryRetriever()
+ * val relevantFacts = retriever.retrieveRelevantMemory(
+ *     query = "favorite food",
+ *     allMemoryFacts = storedMemories,
+ *     recentMessages = conversationHistory
+ * )
+ * ```
  */
 class MemoryRetriever {
 
     /**
-     * Retrieves memory facts based on relevance to the query
+     * Retrieves memory facts that are most relevant to the given query.
+     *
+     * @param query The user query to search relevant memories for.
+     * @param allMemoryFacts All stored memory facts.
+     * @param recentMessages (Optional) Recent messages used to boost contextual relevance.
+     * @param maxResults The maximum number of relevant memory facts to return.
+     * @return A list of memory facts sorted by relevance.
+     * @throws IllegalArgumentException if maxResults is less than 1.
      */
     fun retrieveRelevantMemory(
         query: String,
@@ -22,7 +47,7 @@ class MemoryRetriever {
             return emptyList()
         }
 
-        // Extract important terms from the query
+        // Extract important words from the query
         val queryTerms = extractImportantTerms(query.lowercase(Locale.getDefault()))
         if (queryTerms.isEmpty()) {
             return emptyList()
@@ -35,7 +60,7 @@ class MemoryRetriever {
             Pair(fact, score)
         }
 
-        // Sort by relevance score (descending) and take top results
+        // Return top results sorted by score
         return scoredFacts
             .sortedByDescending { it.second }
             .take(maxResults)
@@ -43,7 +68,11 @@ class MemoryRetriever {
     }
 
     /**
-     * Extracts important terms from the query
+     * Extracts important keywords from the user query to be used in relevance scoring.
+     * It removes common stopwords and filters out very short words.
+     *
+     * @param query The user input to extract keywords from.
+     * @return A list of filtered and distinct keywords.
      */
     private fun extractImportantTerms(query: String): List<String> {
         // Remove common stopwords
@@ -60,7 +89,12 @@ class MemoryRetriever {
     }
 
     /**
-     * Calculates relevance score between memory fact and query terms
+     * Calculates how relevant a memory fact is to the given query terms and recent context.
+     *
+     * @param factText The text of the memory fact (key + value).
+     * @param queryTerms Important words extracted from the user query.
+     * @param recentMessages A list of recent user or system messages.
+     * @return A score representing the relevance of the memory fact.
      */
     private fun calculateRelevanceScore(
         factText: String,
@@ -68,8 +102,8 @@ class MemoryRetriever {
         recentMessages: List<Message>
     ): Double {
         var score = 0.0
-        
-        // Direct term matching
+
+        // Match each query term in the fact
         for (term in queryTerms) {
             if (factText.contains(term)) {
                 // Count occurrences

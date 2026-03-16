@@ -7,50 +7,69 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * Manages application settings and preferences
+ * Handles app settings like memory and voice features.
+ *
+ * Stores and updates user preferences using SharedPreferences.
+ * Also provides live updates using Flow.
  */
 class SettingsManager(context: Context) {
 
     private val sharedPrefs: SharedPreferences = context.getSharedPreferences(
         PREFS_NAME, Context.MODE_PRIVATE
     )
-    
-    // Memory feature settings
+
+    // Flow to keep track of memory setting
     private val _memoryEnabled = MutableStateFlow(isMemoryEnabled())
     val memoryEnabled: Flow<Boolean> = _memoryEnabled.asStateFlow()
-    
-    // Voice feature settings
+
+    // Flow to keep track of voice input setting
     private val _voiceInputEnabled = MutableStateFlow(isVoiceInputEnabled())
     val voiceInputEnabled: Flow<Boolean> = _voiceInputEnabled.asStateFlow()
-    
+
+    // Flow to keep track of voice output setting
     private val _voiceOutputEnabled = MutableStateFlow(isVoiceOutputEnabled())
     val voiceOutputEnabled: Flow<Boolean> = _voiceOutputEnabled.asStateFlow()
-    
-    // Memory settings
+
+    /**
+     * Checks if memory feature is turned on.
+     */
     fun isMemoryEnabled(): Boolean {
         return sharedPrefs.getBoolean(KEY_MEMORY_ENABLED, true)
     }
-    
+
+    /**
+     * Turn memory feature on or off.
+     */
     fun setMemoryEnabled(enabled: Boolean) {
         sharedPrefs.edit().putBoolean(KEY_MEMORY_ENABLED, enabled).apply()
         _memoryEnabled.value = enabled
     }
-    
-    // Voice input settings
+
+    /**
+     * Checks if voice input is turned on.
+     */
     fun isVoiceInputEnabled(): Boolean {
         return sharedPrefs.getBoolean(KEY_VOICE_INPUT_ENABLED, true)
     }
-    
+
+    /**
+     * Turn voice input on or off.
+     */
     fun setVoiceInputEnabled(enabled: Boolean) {
         sharedPrefs.edit().putBoolean(KEY_VOICE_INPUT_ENABLED, enabled).apply()
         _voiceInputEnabled.value = enabled
     }
-    
-    // Voice output settings
+
+    /**
+     * Checks if voice output is turned on.
+     */
     fun isVoiceOutputEnabled(): Boolean {
         return sharedPrefs.getBoolean(KEY_VOICE_OUTPUT_ENABLED, true)
     }
-    
+
+    /**
+     * Turn voice output on or off.
+     */
     fun setVoiceOutputEnabled(enabled: Boolean) {
         sharedPrefs.edit().putBoolean(KEY_VOICE_OUTPUT_ENABLED, enabled).apply()
         _voiceOutputEnabled.value = enabled
