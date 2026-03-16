@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Primary brand colors (unchanged) -->
+    <color name="primaryColor">#4F46E5</color>
+    <color name="primaryVariant">#3730A3</color>
+    <color name="primaryLight">#818CF8</color>
+    <!-- Secondary accent colors (unchanged) -->
+    <color name="secondaryColor">#0EA5E9</color>
+    <color name="secondaryVariant">#0284C7</color>
+    <color name="secondaryLight">#38BDF8</color>
+    <!-- Dark mode backgrounds -->
+    <color name="backgroundColor">#1F2937</color>
+    <color name="surfaceColor">#111827</color>
+    <color name="backgroundDark">#1F2937</color>
+    <color name="surfaceDark">#111827</color>
+    <color name="background">#121212</color>
+    <!-- Text colors for dark mode -->
+    <color name="textPrimary">#F3F4F6</color>
+    <color name="textSecondary">#9CA3AF</color>
+    <color name="textTertiary">#6B7280</color>
+    <color name="textOnPrimary">#FFFFFF</color>
+    <color name="textOnSecondary">#FFFFFF</color>
+    <!-- Status colors (unchanged) -->
+    <color name="success">#10B981</color>
+    <color name="warning">#F59E0B</color>
+    <color name="error">#EF4444</color>
+    <color name="errorColor">#EF4444</color>
+    <color name="info">#3B82F6</color>
+    <!-- Chat message colors for dark mode -->
+    <color name="userMessageBackground">#4F46E5</color>
+    <color name="assistantMessageBackground">#23272F</color>
+    <color name="userMessageText">#FFFFFF</color>
+    <color name="assistantMessageText">#F3F4F6</color>
+    <!-- Legacy colors for backward compatibility (unchanged) -->
+    <color name="purple_200">#818CF8</color>
+    <color name="purple_500">#4F46E5</color>
+    <color name="purple_700">#3730A3</color>
+    <color name="teal_200">#38BDF8</color>
+    <color name="teal_700">#0284C7</color>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="ic_launcher_background">#111827</color>
+</resources> 

@@ -25,4 +25,6 @@
     <string name="auto_activate_mic">Auto-activate microphone after speaking</string>
     <string name="auto_activate_mic_description">Automatically start listening after Astra finishes speaking</string>
     <string name="cancel">Cancel</string>
+    <string name="activate_dark_mode">Activate Dark Mode</string>
+    <string name="display_settings">Display Settings</string>
 </resources>
